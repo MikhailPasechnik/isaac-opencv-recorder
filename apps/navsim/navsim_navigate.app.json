@@ -31,6 +31,10 @@
           {
             "name": "depth_viewer",
             "type": "isaac::viewers::DepthCameraViewer"
+          },
+          {
+            "name": "segmentation_viewer",
+            "type": "isaac::viewers::SegmentationCameraViewer"
           }
         ]
       },
@@ -84,6 +88,10 @@
       {
         "source": "simulation.interface/output/depth",
         "target": "camera_viewer/depth_viewer/depth_listener"
+      },
+      {
+        "source": "simulation.interface/output/segmentation",
+        "target": "camera_viewer/segmentation_viewer/segmentation_listener"
       },
       {
         "source": "navigation.planner.global_plan_smoother/smoother/smooth_plan",
@@ -144,6 +152,10 @@
         "max_visualization_depth": 20.0,
         "target_fps": 20,
         "reduce_scale": 4
+      },
+      "segmentation_viewer": {
+        "camera_name": "camera",
+        "target_fps": 15
       }
     }
   }

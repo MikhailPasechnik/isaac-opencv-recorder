@@ -1,0 +1,24 @@
+{
+  "graph": {
+    "nodes": [
+      {
+        "name": "opencv_recorder_node",
+        "components": [
+          {
+            "name": "opencv_recorder_component",
+            "type": "isaac::alice::PyCodelet"
+          }
+        ]
+      }
+    ]
+  },
+  "config": {
+    "opencv_recorder_node": {
+      "opencv_recorder_component":{
+        "config": {
+          "message": "Hello OpenCV!"
+        }
+      }
+    }
+  }
+}

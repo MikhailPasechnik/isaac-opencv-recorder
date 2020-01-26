@@ -6,6 +6,33 @@
   ],
   "graph": {
     "nodes": [
+      
+      {
+        "name": "recorder_bridge",
+        "components": [
+          {
+            "name": "message_ledger",
+            "type": "isaac::alice::MessageLedger"
+          },
+          {
+            "name": "RecorderBridge",
+            "type": "isaac::alice::RecorderBridge"
+          }
+        ]
+      },
+      {
+        "name": "recorder",
+        "components": [
+          {
+            "name": "message_ledger",
+            "type": "isaac::alice::MessageLedger"
+          },
+          {
+            "name": "isaac.alice.Recorder",
+            "type": "isaac::alice::Recorder"
+          }
+        ]
+      },
       {
         "name": "simulation",
         "subgraph": "packages/navsim/apps/navsim.subgraph.json"
@@ -98,10 +125,39 @@
       {
         "source": "simulation.interface/output/bounding_boxes",
         "target": "bounding_box_viewer/viewer/detections"
+      },
+      {
+        "source": "simulation.interface/output/segmentation",
+        "target": "recorder/isaac.alice.Recorder/segmentation"
+      },
+      {
+        "source": "simulation.interface/output/color",
+        "target": "recorder/isaac.alice.Recorder/color"
+      },
+      {
+        "source": "websight/WebsightServer/record",
+        "target": "recorder_bridge/RecorderBridge/request"
+      },
+      {
+        "source": "recorder_bridge/RecorderBridge/reply",
+        "target": "websight/WebsightServer/recorder_reply"
       }
     ]
   },
   "config": {
+    "recorder": {
+        "isaac.alice.Recorder": {
+        "base_directory": "/tmp/isaac",
+        "tag": "test",
+        "enabled": false
+      }
+    },
+    "recorder_bridge": {
+      "RecorderBridge": {
+        "recorder_component_name": "recorder/isaac.alice.Recorder",
+        "tick_period": "50Hz"
+      }
+    },
     "viewer": {
       "depth_viewer": {
         "colormap": [

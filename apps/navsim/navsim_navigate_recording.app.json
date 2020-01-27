@@ -6,6 +6,19 @@
   "graph": {
     "nodes": [
       {
+        "name": "opencv_recorder_node",
+        "components": [
+          {
+            "name": "message_ledger",
+            "type": "isaac::alice::MessageLedger"
+          },
+          {
+            "name": "opencv_recorder_component",
+            "type": "isaac::alice::PyCodelet"
+          }
+        ]
+      },
+      {
         "name": "simulation",
         "subgraph": "packages/navsim/apps/navsim.subgraph.json"
       },
@@ -100,10 +113,26 @@
       {
         "source": "navigation.control.lqr/isaac.planner.DifferentialBaseLqrPlanner/plan",
         "target": "simulation.interface/sight/local_plan"
+      },
+      {
+        "source": "simulation.interface/output/color",
+        "target": "opencv_recorder_node/opencv_recorder_component/color"
+      },
+      {
+        "source": "simulation.interface/output/segmentation",
+        "target": "opencv_recorder_node/opencv_recorder_component/segmentation"
       }
     ]
   },
   "config": {
+    "opencv_recorder_node": {
+      "opencv_recorder_component":{
+        "config": {
+          "color_out": "Hello Word!",
+          "message": "Hello Word!"
+        }
+      }
+    },
     "behavior_main": {
       "MemorySequenceBehavior": {
         "tick_period": "10Hz"

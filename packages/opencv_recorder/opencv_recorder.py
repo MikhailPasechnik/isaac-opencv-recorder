@@ -1,69 +1,103 @@
 from engine.pyalice import *
 import numpy as np
 import cv2
+import click
+from functools import partial
+
+
+def handleTickException(func):
+    def wrapped(self, *args, **kwargs):
+        try:
+            func(self, *args, **kwargs)
+        except Exception:
+            self.logger.exception(self.node_name, exc_info=1)
+    return wrapped
+
 
 class OpencvRccorder(Codelet):
+    def __init__(
+            self, backend, logger, node_name, segmentation_out, color_out
+        ):
+        super().__init__(backend, logger, node_name)
+        self.segmentation_out = segmentation_out
+        self.color_out = color_out
+        self.logger = logger
+        self.node_name = node_name
+
     def start(self):
-        self.rx_color = self.isaac_proto_rx("ColorCameraProto", "color")
-        self.color_writer = cv2.VideoWriter(
-            '/home/misha/Desktop/output.mp4', cv2.VideoWriter_fourcc(*"MP4V"), 
-            25.0, (1280,720)
+        self.log_info(
+            "Start: %s segmentation_out: %s color_out: %s" %
+            (self.node_name, self.segmentation_out, self.color_out)
         )
-        # This part will be run once in the beginning of the program
-        # We can tick periodically, on every message, or blocking. See documentation for details.
+        self.rx_color = self.isaac_proto_rx("ColorCameraProto", "color")
+        self.rx_segmentation = self.isaac_proto_rx("SegmentationCameraProto", "segmentation")
+        self.color_writer = None
+        self.segmentation_writer = None
+        self.synchronize(self.rx_color, self.rx_segmentation)
         self.tick_on_message(self.rx_color)
 
     def stop(self):
         self.log_info("Releasing writers..")
         self.color_writer.release()
+        self.segmentation_writer.release()
 
-    def tick(self):
-        # This part will be run at every tick. We are ticking periodically in this example.
+    def write_color(self, rx):
+        proto = rx.get_proto()
+        image = np.frombuffer(
+            rx.get_buffer_content(
+                proto.image.dataBufferIndex
+            ), np.uint8).reshape(
+                proto.image.rows, 
+                proto.image.cols, 
+                proto.image.channels
+            )
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        if self.color_writer is None:
+            self.color_writer = cv2.VideoWriter(
+                self.color_out, cv2.VideoWriter_fourcc(*"mp4v"), 
+                25.0, (proto.image.cols, proto.image.rows)
+            )
+        self.color_writer.write(image)
 
-        # Print out message to console. The message is set in ping_python.app.json file.
-        self.log_info(self.get_isaac_param("message"))
-    
-        if not self.rx_color.available():
-            return
-        color_proto = self.rx_color.get_proto()
-        color_image = cv2.cvtColor(np.frombuffer(
-                self.rx_color.get_buffer_content(
-                    color_proto.image.dataBufferIndex
-                ),
-                np.uint8
-            ).reshape(
-                color_proto.image.rows, 
-                color_proto.image.cols, 
-                color_proto.image.channels
-            ), 
-            cv2.COLOR_BGR2RGB
-        )
-
-        #img_np = cv2.cvtColor(
-        #    image_data, cv2.COLOR_
-        #) # cv2.IMREAD_COLOR in OpenCV 3.1
-        self.log_info("Got img: %s %s %s" % (color_proto, 'img_np', color_image.shape))
-        #cv2.imwrite('/tmp/image.png',color_image)
-        self.color_writer.write(color_image)
-        #   auto input = rx_input_image().getProto();
+    def write_segmentation(self, rx):
+        proto = rx.get_proto()
+        image = np.frombuffer(
+            rx.get_buffer_content(
+                proto.labelImage.dataBufferIndex
+            ), np.uint8).reshape(
+                proto.labelImage.rows, 
+                proto.labelImage.cols, 
+                proto.labelImage.channels
+            )
         
-        # ImageConstView3ub input_image;
-        # bool ok = FromProto(input.getImage(), rx_input_image().buffers(), input_image);
-        # ASSERT(ok, "Failed to deserialize the input image");
-
-        # const size_t rows = input_image.rows();
-        # const size_t cols = input_image.cols();
-        # Image1ub output_image(rows, cols);
-        # cv::Mat image =
-        #     cv::Mat(rows, cols, CV_8UC3,
-        #             const_cast<void*>(static_cast<const void*>(input_image.data().pointer())));
-
-    
+        # HACK: scale as we have only one floor label
+        image = image*255
+        
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        if self.segmentation_writer is None:
+            self.segmentation_writer = cv2.VideoWriter(
+                self.segmentation_out, cv2.VideoWriter_fourcc(*"mp4v"), 
+                25.0, (proto.labelImage.cols, proto.labelImage.rows)
+            )
+        self.segmentation_writer.write(image)
 
 
-def main():
-    app = Application(app_filename="packages/opencv_recorder/opencv_recorder.app.json")
-    app.register({"opencv_recorder_node": OpencvRccorder})
+    @handleTickException
+    def tick(self):
+        assert self.rx_segmentation.available() and self.rx_color.available()
+        self.write_color(self.rx_color)
+        self.write_segmentation(self.rx_segmentation)
+
+@click.command()
+@click.option('--app_filename', required=True, type=click.Path(exists=True), help='Application(app_filename=..)')
+@click.option('--more', default=(), type=click.Path(exists=True), help='Application(more=..)', multiple=True)
+@click.option('--color_out', required=True, type=click.Path(resolve_path=True, writable=True),)
+@click.option('--segmentation_out', required=True, type=click.Path(resolve_path=True, writable=True),)
+def main(app_filename, more, color_out, segmentation_out):
+    app = Application(app_filename=app_filename, more_jsons=','.join(more))
+    app.register(
+        {"opencv_recorder_node": partial(OpencvRccorder, color_out=color_out, segmentation_out=segmentation_out)}
+    )
     app.start_wait_stop()
 
 

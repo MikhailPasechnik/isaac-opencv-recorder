@@ -85,14 +85,16 @@ class OpencvRccorder(Codelet):
     @handleTickException
     def tick(self):
         assert self.rx_segmentation.available() and self.rx_color.available()
-        self.write_color(self.rx_color)
-        self.write_segmentation(self.rx_segmentation)
+        if self.color_out:
+            self.write_color(self.rx_color)
+        if self.segmentation_out:
+            self.write_segmentation(self.rx_segmentation)
 
 @click.command()
 @click.option('--app_filename', required=True, type=click.Path(exists=True), help='Application(app_filename=..)')
 @click.option('--more', default=(), type=click.Path(exists=True), help='Application(more=..)', multiple=True)
-@click.option('--color_out', required=True, type=click.Path(resolve_path=True, writable=True),)
-@click.option('--segmentation_out', required=True, type=click.Path(resolve_path=True, writable=True),)
+@click.option('--color_out', default=None, type=click.Path(resolve_path=True, writable=True),)
+@click.option('--segmentation_out', default=None, type=click.Path(resolve_path=True, writable=True),)
 def main(app_filename, more, color_out, segmentation_out):
     app = Application(app_filename=app_filename, more_jsons=','.join(more))
     app.register(
